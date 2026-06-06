@@ -1,5 +1,7 @@
 """myenergi API client for Eddi control."""
 
+from __future__ import annotations
+
 import warnings
 import urllib3
 
