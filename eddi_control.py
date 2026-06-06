@@ -13,6 +13,7 @@ warnings.filterwarnings("ignore", message=".*urllib3.*OpenSSL.*")
 from dotenv import load_dotenv  # pylint: disable=wrong-import-position
 
 from myenergi_client import MyenergiClient  # pylint: disable=wrong-import-position
+from notifier import send_whatsapp_multi  # pylint: disable=wrong-import-position
 
 logger = logging.getLogger("eddi_control")
 
@@ -64,6 +65,18 @@ def get_client() -> MyenergiClient:
         sys.exit(1)
 
     return MyenergiClient(hub_serial, api_key, server=server or None)
+
+
+def notify(message: str):
+    """Send a WhatsApp notification if Callmebot credentials are configured."""
+    phones = os.getenv("CALLMEBOT_PHONE")
+    api_keys = os.getenv("CALLMEBOT_API_KEY")
+
+    if not phones or not api_keys:
+        logger.debug("WhatsApp notifications not configured, skipping")
+        return
+
+    send_whatsapp_multi(phones, api_keys, message)
 
 
 def pick_eddi(client: MyenergiClient, serial: str = None) -> str:
@@ -133,6 +146,10 @@ def cmd_status(args):  # pylint: disable=too-many-locals
     elapsed = time.time() - start_time
     logger.info("Completed in %.2fs", elapsed)
 
+    # Build compact status message for WhatsApp
+    msg = f"📊 Eddi Status: {status_text} | Grid: {format_power(grid)}."
+    notify(msg)
+
 
 def cmd_start(args):
     """Start the Eddi in normal (diverting) mode."""
@@ -144,7 +161,9 @@ def cmd_start(args):
     client.eddi_start(serial)
 
     elapsed = time.time() - start_time
-    logger.info("Eddi %s: Started (normal mode) [%.2fs]", serial, elapsed)
+    msg = f"Eddi {serial}: Started (normal mode) [{elapsed:.2f}s]"
+    logger.info(msg)
+    notify("🟢 Your Eddi water heater has been started.")
 
 
 def cmd_stop(args):
@@ -157,7 +176,9 @@ def cmd_stop(args):
     client.eddi_stop(serial)
 
     elapsed = time.time() - start_time
-    logger.info("Eddi %s: Stopped [%.2fs]", serial, elapsed)
+    msg = f"Eddi {serial}: Stopped [{elapsed:.2f}s]"
+    logger.info(msg)
+    notify("🔴 Your Eddi water heater has been stopped.")
 
 
 def cmd_boost(args):
@@ -171,9 +192,13 @@ def cmd_boost(args):
                      serial, args.heater)
         client.eddi_cancel_boost(serial, heater=args.heater)
         elapsed = time.time() - start_time
-        logger.info(
-            "Eddi %s: Boost cancelled for heater %d [%.2fs]",
-            serial, args.heater, elapsed,
+        msg = (
+            f"Eddi {serial}: Boost cancelled for "
+            f"heater {args.heater} [{elapsed:.2f}s]"
+        )
+        logger.info(msg)
+        notify(
+            "⏹ Your Eddi water heater boost has been cancelled."
         )
     else:
         logger.info("Boosting Eddi %s heater %d for %d min...",
@@ -182,9 +207,14 @@ def cmd_boost(args):
             serial, heater=args.heater, minutes=args.minutes
         )
         elapsed = time.time() - start_time
-        logger.info(
-            "Eddi %s: Boosting heater %d for %d min [%.2fs]",
-            serial, args.heater, args.minutes, elapsed,
+        msg = (
+            f"Eddi {serial}: Boosting heater {args.heater} "
+            f"for {args.minutes} min [{elapsed:.2f}s]"
+        )
+        logger.info(msg)
+        notify(
+            f"⚡ Your Eddi water heater is boosting "
+            f"heater {args.heater} for {args.minutes} min."
         )
 
 
