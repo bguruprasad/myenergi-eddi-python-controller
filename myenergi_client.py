@@ -30,13 +30,20 @@ class MyenergiClient:
                 "Could not determine server from director response. "
                 f"Headers: {dict(resp.headers)}"
             )
-        return asn.strip()
+        asn = asn.strip()
+        # Director may return just "s18" or full "s18.myenergi.net"
+        if ".myenergi.net" in asn:
+            return asn
+        return asn
 
     def _get_base_url(self) -> str:
         if not self.base_url:
             server = self._discover_server()
-            self.base_url = f"https://{server}.myenergi.net"
-            print(f"Discovered server: {server}")
+            if ".myenergi.net" in server:
+                self.base_url = f"https://{server}"
+            else:
+                self.base_url = f"https://{server}.myenergi.net"
+            print(f"Discovered server: {self.base_url}")
         return self.base_url
 
     def _get(self, path: str) -> dict:
