@@ -25,6 +25,8 @@ Copy `.env.example` to `.env` and set the following:
 | `MYENERGI_HUB_SERIAL` | Yes | Your hub serial number (found in the app under Hub, or printed on the device) |
 | `MYENERGI_API_KEY` | Yes | API key generated from the myenergi mobile app (My Account > Advanced) |
 | `MYENERGI_SERVER` | No | Server hostname, e.g. `s18` (auto-discovered from the director if not set) |
+| `CALLMEBOT_PHONE` | No | Your phone number with country code for WhatsApp notifications (e.g. `+353861234567`) |
+| `CALLMEBOT_API_KEY` | No | API key from Callmebot for WhatsApp notifications |
 
 ## Usage
 
@@ -94,3 +96,20 @@ MIN  HOUR  DAY  MONTH  WEEKDAY  command
 ```bash
 cat eddi_cron.log
 ```
+
+## WhatsApp Notifications (Optional)
+
+Get a WhatsApp message every time the Eddi is started, stopped, or boosted via this tool.
+
+### Setup
+
+1. Add **+34 611 04 87 48** to your WhatsApp contacts
+2. Send **`I allow callmebot to send me messages`** to that number on WhatsApp
+3. You'll receive an **API key** in the reply
+4. Add to your `.env`:
+   ```
+   CALLMEBOT_PHONE=+353861234567
+   CALLMEBOT_API_KEY=your_api_key
+   ```
+
+Notifications are optional. If the env vars are not set, the tool works normally without them.

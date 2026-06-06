@@ -13,6 +13,7 @@ warnings.filterwarnings("ignore", message=".*urllib3.*OpenSSL.*")
 from dotenv import load_dotenv  # pylint: disable=wrong-import-position
 
 from myenergi_client import MyenergiClient  # pylint: disable=wrong-import-position
+from notifier import send_whatsapp  # pylint: disable=wrong-import-position
 
 logger = logging.getLogger("eddi_control")
 
@@ -64,6 +65,18 @@ def get_client() -> MyenergiClient:
         sys.exit(1)
 
     return MyenergiClient(hub_serial, api_key, server=server or None)
+
+
+def notify(message: str):
+    """Send a WhatsApp notification if Callmebot credentials are configured."""
+    phone = os.getenv("CALLMEBOT_PHONE")
+    api_key = os.getenv("CALLMEBOT_API_KEY")
+
+    if not phone or not api_key:
+        logger.debug("WhatsApp notifications not configured, skipping")
+        return
+
+    send_whatsapp(phone, api_key, message)
 
 
 def pick_eddi(client: MyenergiClient, serial: str = None) -> str:
@@ -144,7 +157,9 @@ def cmd_start(args):
     client.eddi_start(serial)
 
     elapsed = time.time() - start_time
-    logger.info("Eddi %s: Started (normal mode) [%.2fs]", serial, elapsed)
+    msg = f"Eddi {serial}: Started (normal mode) [{elapsed:.2f}s]"
+    logger.info(msg)
+    notify(msg)
 
 
 def cmd_stop(args):
@@ -157,7 +172,9 @@ def cmd_stop(args):
     client.eddi_stop(serial)
 
     elapsed = time.time() - start_time
-    logger.info("Eddi %s: Stopped [%.2fs]", serial, elapsed)
+    msg = f"Eddi {serial}: Stopped [{elapsed:.2f}s]"
+    logger.info(msg)
+    notify(msg)
 
 
 def cmd_boost(args):
@@ -171,10 +188,12 @@ def cmd_boost(args):
                      serial, args.heater)
         client.eddi_cancel_boost(serial, heater=args.heater)
         elapsed = time.time() - start_time
-        logger.info(
-            "Eddi %s: Boost cancelled for heater %d [%.2fs]",
-            serial, args.heater, elapsed,
+        msg = (
+            f"Eddi {serial}: Boost cancelled for "
+            f"heater {args.heater} [{elapsed:.2f}s]"
         )
+        logger.info(msg)
+        notify(msg)
     else:
         logger.info("Boosting Eddi %s heater %d for %d min...",
                      serial, args.heater, args.minutes)
@@ -182,10 +201,12 @@ def cmd_boost(args):
             serial, heater=args.heater, minutes=args.minutes
         )
         elapsed = time.time() - start_time
-        logger.info(
-            "Eddi %s: Boosting heater %d for %d min [%.2fs]",
-            serial, args.heater, args.minutes, elapsed,
+        msg = (
+            f"Eddi {serial}: Boosting heater {args.heater} "
+            f"for {args.minutes} min [{elapsed:.2f}s]"
         )
+        logger.info(msg)
+        notify(msg)
 
 
 def cmd_devices(_args):
