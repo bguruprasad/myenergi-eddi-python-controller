@@ -2,8 +2,10 @@
 """CLI tool to control myenergi Eddi - start, stop, boost."""
 
 import argparse
+import logging
 import os
 import sys
+import time
 import warnings
 
 warnings.filterwarnings("ignore", message=".*urllib3.*OpenSSL.*")
@@ -11,6 +13,8 @@ warnings.filterwarnings("ignore", message=".*urllib3.*OpenSSL.*")
 from dotenv import load_dotenv  # pylint: disable=wrong-import-position
 
 from myenergi_client import MyenergiClient  # pylint: disable=wrong-import-position
+
+logger = logging.getLogger("eddi_control")
 
 # Eddi status codes
 EDDI_STATUS = {
@@ -27,6 +31,23 @@ EDDI_HEATER_STATUS = {
     2: "Heater 2",
 }
 
+LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s - %(message)s"
+LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+
+
+def setup_logging(verbose: bool = False):
+    """Configure logging with timestamps to both console and file."""
+    level = logging.DEBUG if verbose else logging.INFO
+
+    logging.basicConfig(
+        level=level,
+        format=LOG_FORMAT,
+        datefmt=LOG_DATE_FORMAT,
+        handlers=[
+            logging.StreamHandler(sys.stdout),
+        ],
+    )
+
 
 def get_client() -> MyenergiClient:
     """Load credentials from .env and return an authenticated API client."""
@@ -36,8 +57,10 @@ def get_client() -> MyenergiClient:
     server = os.getenv("MYENERGI_SERVER")
 
     if not hub_serial or not api_key or hub_serial == "your_hub_serial_here":
-        print("Error: Set MYENERGI_HUB_SERIAL and MYENERGI_API_KEY in .env")
-        print("  cp .env.example .env && edit .env")
+        logger.error(
+            "Set MYENERGI_HUB_SERIAL and MYENERGI_API_KEY in .env"
+        )
+        logger.error("  cp .env.example .env && edit .env")
         sys.exit(1)
 
     return MyenergiClient(hub_serial, api_key, server=server or None)
@@ -50,15 +73,15 @@ def pick_eddi(client: MyenergiClient, serial: str = None) -> str:
 
     eddis = client.get_eddi_status()
     if not eddis:
-        print("Error: No Eddi devices found on your hub.")
+        logger.error("No Eddi devices found on your hub.")
         sys.exit(1)
 
     if len(eddis) == 1:
         return str(eddis[0]["sno"])
 
-    print("Multiple Eddi devices found. Use --serial to pick one:")
-    for e in eddis:
-        print(f"  Serial: {e['sno']}")
+    logger.error("Multiple Eddi devices found. Use --serial to pick one:")
+    for eddi in eddis:
+        logger.error("  Serial: %s", eddi['sno'])
     sys.exit(1)
 
 
@@ -69,8 +92,11 @@ def format_power(watts: int) -> str:
     return f"{watts} W"
 
 
-def cmd_status(args):
+def cmd_status(args):  # pylint: disable=too-many-locals
     """Display current Eddi status including temps and power."""
+    start_time = time.time()
+    logger.info("Fetching Eddi status...")
+
     client = get_client()
     serial = pick_eddi(client, args.serial)
     eddi = client.get_eddi_by_serial(serial)
@@ -78,79 +104,109 @@ def cmd_status(args):
     status_code = eddi.get("sta", 0)
     status_text = EDDI_STATUS.get(status_code, f"Unknown ({status_code})")
     heater_num = eddi.get("hno", 0)
-    active_heater = EDDI_HEATER_STATUS.get(heater_num, f"Unknown ({heater_num})")
+    active_heater = EDDI_HEATER_STATUS.get(
+        heater_num, f"Unknown ({heater_num})"
+    )
     diverted = eddi.get("div", 0)
     grid = eddi.get("grd", 0)
     generated = eddi.get("gen", 0)
     temp_1 = eddi.get("tp1", None)
     temp_2 = eddi.get("tp2", None)
     date = eddi.get("dat", "")
-    time = eddi.get("tim", "")
+    eddi_time = eddi.get("tim", "")
 
-    print(f"{'='*45}")
-    print(f" Eddi Status  -  Serial: {serial}")
-    print(f"{'='*45}")
-    print(f"  Status:         {status_text}")
-    print(f"  Active heater:  {active_heater}")
-    print(f"  Diverted:       {format_power(diverted)}")
-    print(f"  Grid:           {format_power(grid)}")
-    print(f"  Generated:      {format_power(generated)}")
+    logger.info("=" * 45)
+    logger.info(" Eddi Status  -  Serial: %s", serial)
+    logger.info("=" * 45)
+    logger.info("  Status:         %s", status_text)
+    logger.info("  Active heater:  %s", active_heater)
+    logger.info("  Diverted:       %s", format_power(diverted))
+    logger.info("  Grid:           %s", format_power(grid))
+    logger.info("  Generated:      %s", format_power(generated))
     if temp_1 is not None:
-        print(f"  Temp (tank 1):  {temp_1 / 10:.1f} C")
+        logger.info("  Temp (tank 1):  %.1f C", temp_1 / 10)
     if temp_2 is not None:
-        print(f"  Temp (tank 2):  {temp_2 / 10:.1f} C")
-    print(f"  Last updated:   {date} {time} UTC")
-    print(f"{'='*45}")
+        logger.info("  Temp (tank 2):  %.1f C", temp_2 / 10)
+    logger.info("  Last updated:   %s %s UTC", date, eddi_time)
+    logger.info("=" * 45)
+
+    elapsed = time.time() - start_time
+    logger.info("Completed in %.2fs", elapsed)
 
 
 def cmd_start(args):
     """Start the Eddi in normal (diverting) mode."""
+    start_time = time.time()
+    logger.info("Starting Eddi...")
+
     client = get_client()
     serial = pick_eddi(client, args.serial)
-    result = client.eddi_start(serial)
-    print(f"Eddi {serial}: Started (normal mode)")
-    return result
+    client.eddi_start(serial)
+
+    elapsed = time.time() - start_time
+    logger.info("Eddi %s: Started (normal mode) [%.2fs]", serial, elapsed)
 
 
 def cmd_stop(args):
     """Stop the Eddi."""
+    start_time = time.time()
+    logger.info("Stopping Eddi...")
+
     client = get_client()
     serial = pick_eddi(client, args.serial)
-    result = client.eddi_stop(serial)
-    print(f"Eddi {serial}: Stopped")
-    return result
+    client.eddi_stop(serial)
+
+    elapsed = time.time() - start_time
+    logger.info("Eddi %s: Stopped [%.2fs]", serial, elapsed)
 
 
 def cmd_boost(args):
     """Boost a heater for a given duration, or cancel an active boost."""
+    start_time = time.time()
     client = get_client()
     serial = pick_eddi(client, args.serial)
 
     if args.cancel:
-        result = client.eddi_cancel_boost(serial, heater=args.heater)
-        print(f"Eddi {serial}: Boost cancelled for heater {args.heater}")
+        logger.info("Cancelling boost on Eddi %s heater %d...",
+                     serial, args.heater)
+        client.eddi_cancel_boost(serial, heater=args.heater)
+        elapsed = time.time() - start_time
+        logger.info(
+            "Eddi %s: Boost cancelled for heater %d [%.2fs]",
+            serial, args.heater, elapsed,
+        )
     else:
-        result = client.eddi_boost(
+        logger.info("Boosting Eddi %s heater %d for %d min...",
+                     serial, args.heater, args.minutes)
+        client.eddi_boost(
             serial, heater=args.heater, minutes=args.minutes
         )
-        print(
-            f"Eddi {serial}: Boosting heater {args.heater} "
-            f"for {args.minutes} min"
+        elapsed = time.time() - start_time
+        logger.info(
+            "Eddi %s: Boosting heater %d for %d min [%.2fs]",
+            serial, args.heater, args.minutes, elapsed,
         )
-    return result
 
 
 def cmd_devices(_args):
     """List all Eddi devices connected to the hub."""
+    start_time = time.time()
+    logger.info("Discovering Eddi devices...")
+
     client = get_client()
     eddis = client.get_eddi_status()
+
     if not eddis:
-        print("No Eddi devices found.")
+        logger.warning("No Eddi devices found.")
         return
-    print(f"Found {len(eddis)} Eddi device(s):")
-    for e in eddis:
-        status = EDDI_STATUS.get(e.get("sta", 0), "Unknown")
-        print(f"  Serial: {e['sno']}  Status: {status}")
+
+    logger.info("Found %d Eddi device(s):", len(eddis))
+    for eddi in eddis:
+        status = EDDI_STATUS.get(eddi.get("sta", 0), "Unknown")
+        logger.info("  Serial: %s  Status: %s", eddi['sno'], status)
+
+    elapsed = time.time() - start_time
+    logger.info("Completed in %.2fs", elapsed)
 
 
 def main():
@@ -165,12 +221,16 @@ examples:
   %(prog)s stop                    Stop Eddi
   %(prog)s boost --minutes 30      Boost heater 1 for 30 min
   %(prog)s boost --heater 2 -m 60  Boost heater 2 for 60 min
-  %(prog)s boost --cancel           Cancel active boost
+  %(prog)s boost --cancel          Cancel active boost
 """,
     )
     parser.add_argument(
         "--serial", "-s",
         help="Eddi serial number (auto-detected if only one)",
+    )
+    parser.add_argument(
+        "--verbose", "-v", action="store_true",
+        help="Enable debug logging",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -194,6 +254,7 @@ examples:
     )
 
     args = parser.parse_args()
+    setup_logging(verbose=args.verbose)
 
     commands = {
         "status": cmd_status,

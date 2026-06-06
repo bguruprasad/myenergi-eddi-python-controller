@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import warnings
 import urllib3
 
@@ -10,6 +11,7 @@ from requests.auth import HTTPDigestAuth
 
 warnings.filterwarnings("ignore", category=urllib3.exceptions.NotOpenSSLWarning)
 
+logger = logging.getLogger(__name__)
 
 DIRECTOR_URL = "https://director.myenergi.net"
 
@@ -25,6 +27,7 @@ class MyenergiClient:
 
     def _discover_server(self) -> str:
         """Query the director to find which server this hub is on."""
+        logger.info("Discovering server from director...")
         resp = requests.get(
             f"{DIRECTOR_URL}/cgi-jstatus-*",
             auth=self.auth,
@@ -44,23 +47,26 @@ class MyenergiClient:
         return asn
 
     def _get_base_url(self) -> str:
+        """Return the base URL, discovering the server if needed."""
         if not self.base_url:
             server = self._discover_server()
             if ".myenergi.net" in server:
                 self.base_url = f"https://{server}"
             else:
                 self.base_url = f"https://{server}.myenergi.net"
-            print(f"Discovered server: {self.base_url}")
+            logger.info("Discovered server: %s", self.base_url)
         return self.base_url
 
     def _get(self, path: str) -> dict:
         """Make an authenticated GET request to the API."""
         url = f"{self._get_base_url()}{path}"
+        logger.debug("GET %s", url)
         resp = requests.get(url, auth=self.auth, timeout=15)
         resp.raise_for_status()
+        logger.debug("Response: %s", resp.status_code)
         return resp.json()
 
-    # ── Device discovery ──────────────────────────────────────────────
+    # -- Device discovery ------------------------------------------------
 
     def get_all_status(self) -> dict:
         """Get status of all connected devices."""
@@ -79,14 +85,16 @@ class MyenergiClient:
             raise ValueError(f"Eddi {serial} not found")
         return eddis[0]
 
-    # ── Eddi control ──────────────────────────────────────────────────
+    # -- Eddi control ----------------------------------------------------
 
     def eddi_start(self, serial: str) -> dict:
         """Set Eddi to normal (active) mode."""
+        logger.info("Starting Eddi %s (normal mode)", serial)
         return self._get(f"/cgi-eddi-mode-E{serial}-1")
 
     def eddi_stop(self, serial: str) -> dict:
         """Set Eddi to stopped mode."""
+        logger.info("Stopping Eddi %s", serial)
         return self._get(f"/cgi-eddi-mode-E{serial}-0")
 
     def eddi_boost(self, serial: str, heater: int = 1, minutes: int = 30) -> dict:
@@ -101,13 +109,18 @@ class MyenergiClient:
         if heater not in (1, 2):
             raise ValueError("Heater must be 1 or 2")
         heater_code = heater * 10  # 10 for heater 1, 20 for heater 2
+        logger.info(
+            "Boosting Eddi %s heater %d for %d minutes",
+            serial, heater, minutes,
+        )
         return self._get(f"/cgi-eddi-boost-E{serial}-{heater_code}-{minutes}")
 
     def eddi_cancel_boost(self, serial: str, heater: int = 1) -> dict:
         """Cancel an active boost on the specified heater."""
+        logger.info("Cancelling boost on Eddi %s heater %d", serial, heater)
         return self.eddi_boost(serial, heater=heater, minutes=0)
 
-    # ── Eddi history ──────────────────────────────────────────────────
+    # -- Eddi history ----------------------------------------------------
 
     def eddi_day_data(self, serial: str, year: int, month: int, day: int) -> dict:
         """Get minute-by-minute energy data for a specific day."""
