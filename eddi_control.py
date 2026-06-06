@@ -147,13 +147,8 @@ def cmd_status(args):  # pylint: disable=too-many-locals
     logger.info("Completed in %.2fs", elapsed)
 
     # Build compact status message for WhatsApp
-    msg_parts = [f"Eddi {serial}: {status_text}"]
-    msg_parts.append(f"Grid: {format_power(grid)}")
-    if temp_1 is not None:
-        msg_parts.append(f"Tank 1: {temp_1 / 10:.1f}C")
-    if temp_2 is not None:
-        msg_parts.append(f"Tank 2: {temp_2 / 10:.1f}C")
-    notify(" | ".join(msg_parts))
+    msg = f"📊 Eddi Status: {status_text} | Grid: {format_power(grid)}."
+    notify(msg)
 
 
 def cmd_start(args):
@@ -168,7 +163,7 @@ def cmd_start(args):
     elapsed = time.time() - start_time
     msg = f"Eddi {serial}: Started (normal mode) [{elapsed:.2f}s]"
     logger.info(msg)
-    notify(msg)
+    notify("🟢 Your Eddi water heater has been started.")
 
 
 def cmd_stop(args):
@@ -183,7 +178,7 @@ def cmd_stop(args):
     elapsed = time.time() - start_time
     msg = f"Eddi {serial}: Stopped [{elapsed:.2f}s]"
     logger.info(msg)
-    notify(msg)
+    notify("🔴 Your Eddi water heater has been stopped.")
 
 
 def cmd_boost(args):
@@ -202,7 +197,9 @@ def cmd_boost(args):
             f"heater {args.heater} [{elapsed:.2f}s]"
         )
         logger.info(msg)
-        notify(msg)
+        notify(
+            "⏹ Your Eddi water heater boost has been cancelled."
+        )
     else:
         logger.info("Boosting Eddi %s heater %d for %d min...",
                      serial, args.heater, args.minutes)
@@ -215,7 +212,10 @@ def cmd_boost(args):
             f"for {args.minutes} min [{elapsed:.2f}s]"
         )
         logger.info(msg)
-        notify(msg)
+        notify(
+            f"⚡ Your Eddi water heater is boosting "
+            f"heater {args.heater} for {args.minutes} min."
+        )
 
 
 def cmd_devices(_args):
