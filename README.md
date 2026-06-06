@@ -34,8 +34,8 @@ Copy `.env.example` to `.env` and set the following:
 | `MYENERGI_HUB_SERIAL` | Yes | Your hub serial number (found in the app under Hub, or printed on the device) |
 | `MYENERGI_API_KEY` | Yes | API key generated from the myenergi mobile app (My Account > Advanced) |
 | `MYENERGI_SERVER` | No | Server hostname, e.g. `s18` (auto-discovered from the director if not set) |
-| `CALLMEBOT_PHONE` | No | Your phone number with country code for WhatsApp notifications (e.g. `+353861234567`) |
-| `CALLMEBOT_API_KEY` | No | API key from Callmebot for WhatsApp notifications |
+| `CALLMEBOT_PHONE` | No | Phone number(s) with country code for WhatsApp notifications. Comma-separated for multiple recipients. |
+| `CALLMEBOT_API_KEY` | No | Callmebot API key(s). Comma-separated, matching the order of phone numbers. |
 
 ## Usage
 
@@ -134,8 +134,13 @@ Get a WhatsApp message every time the Eddi is started, stopped, boosted, or when
 3. You'll receive an **API key** in the reply
 4. Add to your `.env`:
    ```
+   # Single recipient
    CALLMEBOT_PHONE=+353861234567
    CALLMEBOT_API_KEY=your_api_key
+
+   # Multiple recipients (both need to register with Callmebot)
+   CALLMEBOT_PHONE=+353861234567,+353869876543
+   CALLMEBOT_API_KEY=apikey1,apikey2
    ```
 
 ### Notification messages
