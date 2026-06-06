@@ -25,7 +25,7 @@ def send_whatsapp(phone: str, api_key: str, message: str) -> bool:
     """
     try:
         params = {
-            "phone": phone,
+            "phone": phone.lstrip("+"),
             "text": message,
             "apikey": api_key,
         }
