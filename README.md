@@ -41,10 +41,46 @@ python3 eddi_control.py boost --cancel
 python3 eddi_control.py devices
 ```
 
-## Automation Examples
+## Automation (Cron)
+
+Cron jobs are set up to stop Eddi at 10 AM and start at 8 PM IST daily. Logs go to `eddi_cron.log`.
+
+### Managing cron jobs
 
 ```bash
-# Cron: Start Eddi at 1am, stop at 5am (off-peak heating)
-# 0 1 * * * cd /path/to/myenergi && python3 eddi_control.py start
-# 0 5 * * * cd /path/to/myenergi && python3 eddi_control.py stop
+# List current cron jobs
+crontab -l
+
+# Edit cron jobs (opens in text editor)
+crontab -e
+
+# Remove all cron jobs (careful!)
+crontab -r
+```
+
+### Cron time format
+
+```
+MIN  HOUR  DAY  MONTH  WEEKDAY  command
+ 0    10    *     *       *      # every day at 10:00
+ 0    20    *     *      1-5     # weekdays only at 20:00
+*/30  *     *     *       *      # every 30 minutes
+```
+
+### Examples
+
+```bash
+# Stop at 9am, start at 9pm daily
+0 9  * * * cd /path/to/myenergi && /usr/bin/python3 eddi_control.py stop >> /path/to/myenergi/eddi_cron.log 2>&1
+0 21 * * * cd /path/to/myenergi && /usr/bin/python3 eddi_control.py start >> /path/to/myenergi/eddi_cron.log 2>&1
+
+# Weekdays only - stop at 10am, start at 8pm
+0 10 * * 1-5 cd /path/to/myenergi && /usr/bin/python3 eddi_control.py stop >> /path/to/myenergi/eddi_cron.log 2>&1
+0 20 * * 1-5 cd /path/to/myenergi && /usr/bin/python3 eddi_control.py start >> /path/to/myenergi/eddi_cron.log 2>&1
+```
+
+### Check logs
+
+```bash
+cat /path/to/myenergi/eddi_cron.log
 ```
