@@ -1,6 +1,15 @@
 # myenergi Eddi Controller
 
-Automate start/stop and boost control for your myenergi Eddi via the unofficial API.
+Automate start/stop and boost control for your myenergi Eddi via the unofficial API. Includes optional WhatsApp notifications via Callmebot.
+
+## Features
+
+- Start, stop, and boost your Eddi water heater from the command line
+- View real-time status (power, temperatures, mode)
+- Schedule automation via cron
+- WhatsApp notifications on every action (optional)
+- Structured logging with timestamps and duration tracking
+- Verbose mode (`-v`) for debugging API calls
 
 ## Setup
 
@@ -11,7 +20,7 @@ cp .env.example .env
 ```
 
 ### Getting your credentials
-1. Open the **myenergi app**
+1. Open the **myenergi app** on your phone (iOS/Android)
 2. Go to **My Account** > **Advanced**
 3. Note your **Hub Serial Number**
 4. Generate an **API Key**
@@ -51,11 +60,28 @@ python3 eddi_control.py boost --cancel
 
 # List all Eddi devices
 python3 eddi_control.py devices
+
+# Enable debug logging
+python3 eddi_control.py -v status
 ```
+
+## Logging
+
+All commands produce timestamped logs with duration tracking:
+
+```
+2026-06-06 10:23:38 [INFO] eddi_control - Fetching Eddi status...
+2026-06-06 10:23:38 [INFO] myenergi_client - Discovered server: https://s18.myenergi.net
+2026-06-06 10:23:39 [INFO] eddi_control -   Status:         Stopped
+2026-06-06 10:23:39 [INFO] eddi_control -   Grid:           76 W
+2026-06-06 10:23:39 [INFO] eddi_control - Completed in 0.63s
+```
+
+Use `-v` for verbose/debug output including HTTP request details.
 
 ## Automation (Cron)
 
-Cron jobs are set up to stop Eddi at 10 AM and start at 8 PM IST daily. Logs go to `eddi_cron.log`.
+Schedule Eddi start/stop using cron. Logs go to `eddi_cron.log`.
 
 ### Managing cron jobs
 
@@ -82,9 +108,9 @@ MIN  HOUR  DAY  MONTH  WEEKDAY  command
 ### Examples
 
 ```bash
-# Stop at 9am, start at 9pm daily
-0 9  * * * cd /path/to/myenergi && /usr/bin/python3 eddi_control.py stop >> /path/to/myenergi/eddi_cron.log 2>&1
-0 21 * * * cd /path/to/myenergi && /usr/bin/python3 eddi_control.py start >> /path/to/myenergi/eddi_cron.log 2>&1
+# Stop at 10am, start at 8pm daily
+0 10 * * * cd /path/to/myenergi && /usr/bin/python3 eddi_control.py stop >> /path/to/myenergi/eddi_cron.log 2>&1
+0 20 * * * cd /path/to/myenergi && /usr/bin/python3 eddi_control.py start >> /path/to/myenergi/eddi_cron.log 2>&1
 
 # Weekdays only - stop at 10am, start at 8pm
 0 10 * * 1-5 cd /path/to/myenergi && /usr/bin/python3 eddi_control.py stop >> /path/to/myenergi/eddi_cron.log 2>&1
@@ -99,7 +125,7 @@ cat eddi_cron.log
 
 ## WhatsApp Notifications (Optional)
 
-Get a WhatsApp message every time the Eddi is started, stopped, or boosted via this tool.
+Get a WhatsApp message every time the Eddi is started, stopped, boosted, or when you check status. Powered by [Callmebot](https://www.callmebot.com/).
 
 ### Setup
 
@@ -112,4 +138,18 @@ Get a WhatsApp message every time the Eddi is started, stopped, or boosted via t
    CALLMEBOT_API_KEY=your_api_key
    ```
 
-Notifications are optional. If the env vars are not set, the tool works normally without them.
+### Notification messages
+
+| Command | WhatsApp Message |
+|---------|-----------------|
+| `start` | 🟢 Your Eddi water heater has been started. |
+| `stop` | 🔴 Your Eddi water heater has been stopped. |
+| `boost` | ⚡ Your Eddi water heater is boosting heater 1 for 30 min. |
+| `boost --cancel` | ⏹ Your Eddi water heater boost has been cancelled. |
+| `status` | 📊 Eddi Status: Stopped \| Grid: -1.2 kW. |
+
+Notifications are optional. If the env vars are not set, the tool works normally without them. There may be a 5-15 second delay on messages due to the free Callmebot service.
+
+## License
+
+MIT
