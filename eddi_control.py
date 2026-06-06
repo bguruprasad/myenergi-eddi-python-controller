@@ -1,17 +1,16 @@
 #!/usr/bin/env python3
 """CLI tool to control myenergi Eddi - start, stop, boost."""
 
-import warnings
-warnings.filterwarnings("ignore", message=".*urllib3.*OpenSSL.*")
-
 import argparse
 import os
 import sys
-from datetime import datetime
+import warnings
 
-from dotenv import load_dotenv
+warnings.filterwarnings("ignore", message=".*urllib3.*OpenSSL.*")
 
-from myenergi_client import MyenergiClient
+from dotenv import load_dotenv  # pylint: disable=wrong-import-position
+
+from myenergi_client import MyenergiClient  # pylint: disable=wrong-import-position
 
 # Eddi status codes
 EDDI_STATUS = {
@@ -30,6 +29,7 @@ EDDI_HEATER_STATUS = {
 
 
 def get_client() -> MyenergiClient:
+    """Load credentials from .env and return an authenticated API client."""
     load_dotenv()
     hub_serial = os.getenv("MYENERGI_HUB_SERIAL")
     api_key = os.getenv("MYENERGI_API_KEY")
@@ -63,12 +63,14 @@ def pick_eddi(client: MyenergiClient, serial: str = None) -> str:
 
 
 def format_power(watts: int) -> str:
+    """Format a power value in watts to a human-readable string."""
     if abs(watts) >= 1000:
         return f"{watts / 1000:.1f} kW"
     return f"{watts} W"
 
 
 def cmd_status(args):
+    """Display current Eddi status including temps and power."""
     client = get_client()
     serial = pick_eddi(client, args.serial)
     eddi = client.get_eddi_by_serial(serial)
@@ -102,6 +104,7 @@ def cmd_status(args):
 
 
 def cmd_start(args):
+    """Start the Eddi in normal (diverting) mode."""
     client = get_client()
     serial = pick_eddi(client, args.serial)
     result = client.eddi_start(serial)
@@ -110,6 +113,7 @@ def cmd_start(args):
 
 
 def cmd_stop(args):
+    """Stop the Eddi."""
     client = get_client()
     serial = pick_eddi(client, args.serial)
     result = client.eddi_stop(serial)
@@ -118,6 +122,7 @@ def cmd_stop(args):
 
 
 def cmd_boost(args):
+    """Boost a heater for a given duration, or cancel an active boost."""
     client = get_client()
     serial = pick_eddi(client, args.serial)
 
@@ -125,12 +130,18 @@ def cmd_boost(args):
         result = client.eddi_cancel_boost(serial, heater=args.heater)
         print(f"Eddi {serial}: Boost cancelled for heater {args.heater}")
     else:
-        result = client.eddi_boost(serial, heater=args.heater, minutes=args.minutes)
-        print(f"Eddi {serial}: Boosting heater {args.heater} for {args.minutes} min")
+        result = client.eddi_boost(
+            serial, heater=args.heater, minutes=args.minutes
+        )
+        print(
+            f"Eddi {serial}: Boosting heater {args.heater} "
+            f"for {args.minutes} min"
+        )
     return result
 
 
-def cmd_devices(args):
+def cmd_devices(_args):
+    """List all Eddi devices connected to the hub."""
     client = get_client()
     eddis = client.get_eddi_status()
     if not eddis:
@@ -143,6 +154,7 @@ def cmd_devices(args):
 
 
 def main():
+    """Parse CLI arguments and dispatch to the appropriate command."""
     parser = argparse.ArgumentParser(
         description="Control myenergi Eddi - start, stop, and boost",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -157,7 +169,8 @@ examples:
 """,
     )
     parser.add_argument(
-        "--serial", "-s", help="Eddi serial number (auto-detected if only one)"
+        "--serial", "-s",
+        help="Eddi serial number (auto-detected if only one)",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -167,9 +180,18 @@ examples:
     sub.add_parser("devices", help="List all Eddi devices")
 
     boost_p = sub.add_parser("boost", help="Boost a heater")
-    boost_p.add_argument("--heater", type=int, default=1, choices=[1, 2], help="Heater number (default: 1)")
-    boost_p.add_argument("--minutes", "-m", type=int, default=30, help="Boost duration in minutes (default: 30)")
-    boost_p.add_argument("--cancel", action="store_true", help="Cancel active boost")
+    boost_p.add_argument(
+        "--heater", type=int, default=1, choices=[1, 2],
+        help="Heater number (default: 1)",
+    )
+    boost_p.add_argument(
+        "--minutes", "-m", type=int, default=30,
+        help="Boost duration in minutes (default: 30)",
+    )
+    boost_p.add_argument(
+        "--cancel", action="store_true",
+        help="Cancel active boost",
+    )
 
     args = parser.parse_args()
 
