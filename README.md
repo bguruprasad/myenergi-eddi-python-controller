@@ -16,6 +16,16 @@ cp .env.example .env
 3. Note your **Hub Serial Number**
 4. Generate an **API Key**
 
+## Environment Variables
+
+Copy `.env.example` to `.env` and set the following:
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `MYENERGI_HUB_SERIAL` | Yes | Your hub serial number (found in the app under Hub, or printed on the device) |
+| `MYENERGI_API_KEY` | Yes | API key generated from the myenergi mobile app (My Account > Advanced) |
+| `MYENERGI_SERVER` | No | Server hostname, e.g. `s18` (auto-discovered from the director if not set) |
+
 ## Usage
 
 ```bash
