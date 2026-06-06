@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """CLI tool to control myenergi Eddi - start, stop, boost."""
 
+import warnings
+warnings.filterwarnings("ignore", message=".*urllib3.*OpenSSL.*")
+
 import argparse
 import os
 import sys

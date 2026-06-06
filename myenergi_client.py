@@ -1,5 +1,9 @@
 """myenergi API client for Eddi control."""
 
+import warnings
+import urllib3
+warnings.filterwarnings("ignore", category=urllib3.exceptions.NotOpenSSLWarning)
+
 import requests
 from requests.auth import HTTPDigestAuth
 
