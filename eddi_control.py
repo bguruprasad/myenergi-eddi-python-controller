@@ -146,6 +146,15 @@ def cmd_status(args):  # pylint: disable=too-many-locals
     elapsed = time.time() - start_time
     logger.info("Completed in %.2fs", elapsed)
 
+    # Build compact status message for WhatsApp
+    msg_parts = [f"Eddi {serial}: {status_text}"]
+    msg_parts.append(f"Grid: {format_power(grid)}")
+    if temp_1 is not None:
+        msg_parts.append(f"Tank 1: {temp_1 / 10:.1f}C")
+    if temp_2 is not None:
+        msg_parts.append(f"Tank 2: {temp_2 / 10:.1f}C")
+    notify(" | ".join(msg_parts))
+
 
 def cmd_start(args):
     """Start the Eddi in normal (diverting) mode."""
