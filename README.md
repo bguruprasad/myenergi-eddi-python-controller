@@ -92,5 +92,5 @@ MIN  HOUR  DAY  MONTH  WEEKDAY  command
 ### Check logs
 
 ```bash
-cat /path/to/myenergi/eddi_cron.log
+cat eddi_cron.log
 ```
