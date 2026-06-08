@@ -70,11 +70,12 @@ class MyenergiClient:
     def _get(self, path: str) -> dict:
         """Make an authenticated GET request to the API."""
         url = f"{self._get_base_url()}{path}"
-        logger.debug("GET %s", url)
+        logger.info("API call: GET %s", url)
         resp = requests.get(url, auth=self.auth, timeout=15)
         resp.raise_for_status()
-        logger.debug("Response: %s", resp.status_code)
-        return resp.json()
+        data = resp.json()
+        logger.info("API response [%s]: %s", resp.status_code, data)
+        return data
 
     # -- Device discovery ------------------------------------------------
 
@@ -165,13 +166,21 @@ class MyenergiClient:
             logger.info(
                 "Eddi %s: %s attempt %d/%d", serial, label, attempt, attempts
             )
-            command()
+            cmd_result = command()
+            logger.info(
+                "Eddi %s: %s command result (attempt %d/%d): %s",
+                serial, label, attempt, attempts, cmd_result,
+            )
 
             logger.info(
                 "Waiting %ds before verifying %s...", wait_seconds, label
             )
             time.sleep(wait_seconds)
 
+            logger.info(
+                "Eddi %s: verifying %s status (attempt %d/%d)...",
+                serial, label, attempt, attempts,
+            )
             eddi = self.get_eddi_by_serial(serial)
             last_status = eddi.get("sta", -1)
             if is_target(last_status):
