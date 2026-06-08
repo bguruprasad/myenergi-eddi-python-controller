@@ -151,6 +151,11 @@ def cmd_status(args):  # pylint: disable=too-many-locals
     notify(msg)
 
 
+def status_text_for(status_code: int) -> str:
+    """Return a human-readable name for an Eddi `sta` status code."""
+    return EDDI_STATUS.get(status_code, f"Unknown ({status_code})")
+
+
 def cmd_start(args):
     """Start the Eddi in normal (diverting) mode."""
     start_time = time.time()
@@ -158,12 +163,29 @@ def cmd_start(args):
 
     client = get_client()
     serial = pick_eddi(client, args.serial)
-    client.eddi_start(serial)
 
+    if args.no_verify:
+        client.eddi_start(serial)
+        elapsed = time.time() - start_time
+        logger.info("Eddi %s: Started (normal mode) [%.2fs]", serial, elapsed)
+        notify("🟢 Your Eddi water heater has been started.")
+        return
+
+    success, last_status = client.eddi_start_verified(serial)
     elapsed = time.time() - start_time
-    msg = f"Eddi {serial}: Started (normal mode) [{elapsed:.2f}s]"
-    logger.info(msg)
-    notify("🟢 Your Eddi water heater has been started.")
+
+    if success:
+        logger.info("Eddi %s: Started & verified [%.2fs]", serial, elapsed)
+        notify("🟢 Your Eddi water heater has been started (verified).")
+        return
+
+    logger.error("Eddi %s: start FAILED [%.2fs]", serial, elapsed)
+    notify(
+        f"⚠️ FAILED to start your Eddi water heater after 3 attempts. "
+        f"Current state: {status_text_for(last_status)}. "
+        f"Please check manually."
+    )
+    sys.exit(1)
 
 
 def cmd_stop(args):
@@ -173,12 +195,29 @@ def cmd_stop(args):
 
     client = get_client()
     serial = pick_eddi(client, args.serial)
-    client.eddi_stop(serial)
 
+    if args.no_verify:
+        client.eddi_stop(serial)
+        elapsed = time.time() - start_time
+        logger.info("Eddi %s: Stopped [%.2fs]", serial, elapsed)
+        notify("🔴 Your Eddi water heater has been stopped.")
+        return
+
+    success, last_status = client.eddi_stop_verified(serial)
     elapsed = time.time() - start_time
-    msg = f"Eddi {serial}: Stopped [{elapsed:.2f}s]"
-    logger.info(msg)
-    notify("🔴 Your Eddi water heater has been stopped.")
+
+    if success:
+        logger.info("Eddi %s: Stopped & verified [%.2fs]", serial, elapsed)
+        notify("🔴 Your Eddi water heater has been stopped (verified).")
+        return
+
+    logger.error("Eddi %s: stop FAILED [%.2fs]", serial, elapsed)
+    notify(
+        f"⚠️ FAILED to stop your Eddi water heater after 3 attempts. "
+        f"Current state: {status_text_for(last_status)}. "
+        f"Please check manually."
+    )
+    sys.exit(1)
 
 
 def cmd_boost(args):
@@ -265,9 +304,19 @@ examples:
     sub = parser.add_subparsers(dest="command", required=True)
 
     sub.add_parser("status", help="Show Eddi status")
-    sub.add_parser("start", help="Start Eddi (normal mode)")
-    sub.add_parser("stop", help="Stop Eddi")
     sub.add_parser("devices", help="List all Eddi devices")
+
+    start_p = sub.add_parser("start", help="Start Eddi (normal mode)")
+    start_p.add_argument(
+        "--no-verify", action="store_true",
+        help="Skip status verification (faster, no 60s wait)",
+    )
+
+    stop_p = sub.add_parser("stop", help="Stop Eddi")
+    stop_p.add_argument(
+        "--no-verify", action="store_true",
+        help="Skip status verification (faster, no 60s wait)",
+    )
 
     boost_p = sub.add_parser("boost", help="Boost a heater")
     boost_p.add_argument(
