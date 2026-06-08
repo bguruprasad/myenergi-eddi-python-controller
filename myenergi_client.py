@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 import warnings
 import urllib3
 
@@ -14,6 +15,15 @@ warnings.filterwarnings("ignore", category=urllib3.exceptions.NotOpenSSLWarning)
 logger = logging.getLogger(__name__)
 
 DIRECTOR_URL = "https://director.myenergi.net"
+
+# Eddi `sta` value when the device is stopped. Anything else means running
+# (Paused / Diverting / Boosting / Max Temp Reached).
+STATUS_STOPPED = 6
+
+# Defaults for verified mode changes: poll status after each command to
+# confirm the device actually obeyed, retrying a few times before giving up.
+VERIFY_ATTEMPTS = 3
+VERIFY_WAIT_SECONDS = 60
 
 
 class MyenergiClient:
@@ -119,6 +129,100 @@ class MyenergiClient:
         """Cancel an active boost on the specified heater."""
         logger.info("Cancelling boost on Eddi %s heater %d", serial, heater)
         return self.eddi_boost(serial, heater=heater, minutes=0)
+
+    # -- Verified mode changes -------------------------------------------
+
+    def _set_mode_verified(  # pylint: disable=too-many-arguments
+        self,
+        serial: str,
+        *,
+        command,
+        is_target,
+        label: str,
+        attempts: int = VERIFY_ATTEMPTS,
+        wait_seconds: int = VERIFY_WAIT_SECONDS,
+    ) -> tuple[bool, int]:
+        """Issue a mode command, then poll status to confirm it took effect.
+
+        Sometimes the API accepts a command (HTTP 200) but the Eddi does not
+        actually change state. This re-issues the command up to `attempts`
+        times, waiting `wait_seconds` between each command and its check.
+
+        Args:
+            serial: Eddi serial number.
+            command: Zero-arg callable that issues the mode command.
+            is_target: Predicate on the `sta` status code; True when the
+                desired state has been reached.
+            label: Human-readable action name for logging (e.g. "stop").
+            attempts: Max number of command+verify cycles.
+            wait_seconds: Seconds to wait after a command before checking.
+
+        Returns:
+            (success, last_status) where last_status is the most recent `sta`.
+        """
+        last_status = -1
+        for attempt in range(1, attempts + 1):
+            logger.info(
+                "Eddi %s: %s attempt %d/%d", serial, label, attempt, attempts
+            )
+            command()
+
+            logger.info(
+                "Waiting %ds before verifying %s...", wait_seconds, label
+            )
+            time.sleep(wait_seconds)
+
+            eddi = self.get_eddi_by_serial(serial)
+            last_status = eddi.get("sta", -1)
+            if is_target(last_status):
+                logger.info(
+                    "Eddi %s: %s verified on attempt %d (sta=%s)",
+                    serial, label, attempt, last_status,
+                )
+                return True, last_status
+
+            logger.warning(
+                "Eddi %s: %s not confirmed on attempt %d (sta=%s)",
+                serial, label, attempt, last_status,
+            )
+
+        logger.error(
+            "Eddi %s: %s FAILED after %d attempts (sta=%s)",
+            serial, label, attempts, last_status,
+        )
+        return False, last_status
+
+    def eddi_stop_verified(
+        self,
+        serial: str,
+        attempts: int = VERIFY_ATTEMPTS,
+        wait_seconds: int = VERIFY_WAIT_SECONDS,
+    ) -> tuple[bool, int]:
+        """Stop the Eddi and confirm it actually stopped, retrying if not."""
+        return self._set_mode_verified(
+            serial,
+            command=lambda: self.eddi_stop(serial),
+            is_target=lambda sta: sta == STATUS_STOPPED,
+            label="stop",
+            attempts=attempts,
+            wait_seconds=wait_seconds,
+        )
+
+    def eddi_start_verified(
+        self,
+        serial: str,
+        attempts: int = VERIFY_ATTEMPTS,
+        wait_seconds: int = VERIFY_WAIT_SECONDS,
+    ) -> tuple[bool, int]:
+        """Start the Eddi and confirm it left the stopped state, retrying."""
+        return self._set_mode_verified(
+            serial,
+            command=lambda: self.eddi_start(serial),
+            is_target=lambda sta: sta != STATUS_STOPPED,
+            label="start",
+            attempts=attempts,
+            wait_seconds=wait_seconds,
+        )
 
     # -- Eddi history ----------------------------------------------------
 
