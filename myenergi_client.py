@@ -76,11 +76,11 @@ class MyenergiClient:
     def _get(self, path: str) -> dict:
         """Make an authenticated GET request to the API."""
         url = f"{self._get_base_url()}{path}"
-        logger.info("API call: GET %s", url)
+        logger.debug("API call: GET %s", url)
         resp = requests.get(url, auth=self.auth, timeout=15)
         resp.raise_for_status()
         data = resp.json()
-        logger.info("API response [%s]: %s", resp.status_code, data)
+        logger.debug("API response [%s]: %s", resp.status_code, data)
         return data
 
     # -- Device discovery ------------------------------------------------
@@ -174,13 +174,13 @@ class MyenergiClient:
             )
             try:
                 cmd_result = command()
-                logger.info(
-                    "Eddi %s: %s command result (attempt %d/%d): %s",
-                    serial, label, attempt, attempts, cmd_result,
+                logger.debug(
+                    "Eddi %s: %s command response: %s",
+                    serial, label, cmd_result,
                 )
             except Exception:  # pylint: disable=broad-except
                 logger.exception(
-                    "Eddi %s: %s command raised an error (attempt %d/%d)",
+                    "Eddi %s: %s command error (attempt %d/%d)",
                     serial, label, attempt, attempts,
                 )
 
@@ -194,10 +194,6 @@ class MyenergiClient:
             # hasn't reflected the new state yet).
             verified = False
             for poll in range(1, VERIFY_POLLS + 1):
-                logger.info(
-                    "Eddi %s: verifying %s (attempt %d/%d, poll %d/%d)...",
-                    serial, label, attempt, attempts, poll, VERIFY_POLLS,
-                )
                 try:
                     eddi = self.get_eddi_by_serial(serial)
                     last_status = eddi.get("sta", -1)
@@ -207,23 +203,20 @@ class MyenergiClient:
                         "(attempt %d/%d, poll %d/%d)",
                         serial, attempt, attempts, poll, VERIFY_POLLS,
                     )
-                    # Status unknown; sleep and retry the poll.
                     if poll < VERIFY_POLLS:
                         time.sleep(VERIFY_POLL_INTERVAL)
                     continue
 
                 if is_target(last_status):
                     logger.info(
-                        "Eddi %s: %s verified on attempt %d, poll %d "
-                        "(sta=%s)",
+                        "Eddi %s: %s verified (attempt %d, poll %d, sta=%s)",
                         serial, label, attempt, poll, last_status,
                     )
                     verified = True
                     break
 
                 logger.info(
-                    "Eddi %s: %s not yet confirmed "
-                    "(attempt %d/%d, poll %d/%d, sta=%s)",
+                    "Eddi %s: %s pending (attempt %d/%d, poll %d/%d, sta=%s)",
                     serial, label, attempt, attempts,
                     poll, VERIFY_POLLS, last_status,
                 )
