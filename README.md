@@ -67,7 +67,7 @@ python3 eddi_control.py -v status
 
 ## Logging
 
-All commands produce timestamped logs with duration tracking:
+All commands produce timestamped logs with duration tracking. Logs are written to both the console and `eddi_cron.log` (auto-rotated at 10 MB, 1 backup kept).
 
 ```
 2026-06-06 10:23:38 [INFO] eddi_control - Fetching Eddi status...
@@ -77,11 +77,11 @@ All commands produce timestamped logs with duration tracking:
 2026-06-06 10:23:39 [INFO] eddi_control - Completed in 0.63s
 ```
 
-Use `-v` for verbose/debug output including HTTP request details.
+Use `-v` for verbose/debug output including full API request and response details.
 
 ## Automation (Cron)
 
-Schedule Eddi start/stop using cron. Logs go to `eddi_cron.log`.
+Schedule Eddi start/stop using cron. The app writes to `eddi_cron.log` automatically (no shell redirect needed).
 
 ### Managing cron jobs
 
@@ -109,12 +109,12 @@ MIN  HOUR  DAY  MONTH  WEEKDAY  command
 
 ```bash
 # Stop at 10am, start at 8pm daily
-0 10 * * * cd /path/to/myenergi && /usr/bin/python3 eddi_control.py stop >> /path/to/myenergi/eddi_cron.log 2>&1
-0 20 * * * cd /path/to/myenergi && /usr/bin/python3 eddi_control.py start >> /path/to/myenergi/eddi_cron.log 2>&1
+0 10 * * * cd /path/to/myenergi && /usr/bin/python3 eddi_control.py stop 2>&1
+0 20 * * * cd /path/to/myenergi && /usr/bin/python3 eddi_control.py start 2>&1
 
 # Weekdays only - stop at 10am, start at 8pm
-0 10 * * 1-5 cd /path/to/myenergi && /usr/bin/python3 eddi_control.py stop >> /path/to/myenergi/eddi_cron.log 2>&1
-0 20 * * 1-5 cd /path/to/myenergi && /usr/bin/python3 eddi_control.py start >> /path/to/myenergi/eddi_cron.log 2>&1
+0 10 * * 1-5 cd /path/to/myenergi && /usr/bin/python3 eddi_control.py stop 2>&1
+0 20 * * 1-5 cd /path/to/myenergi && /usr/bin/python3 eddi_control.py start 2>&1
 ```
 
 ### Check logs
