@@ -3,6 +3,7 @@
 
 import argparse
 import logging
+import logging.handlers
 import os
 import sys
 import time
@@ -35,18 +36,30 @@ EDDI_HEATER_STATUS = {
 LOG_FORMAT = "%(asctime)s [%(levelname)s] %(name)s - %(message)s"
 LOG_DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
+LOG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "eddi_cron.log")
+LOG_MAX_BYTES = 10 * 1024 * 1024  # 10 MB
+LOG_BACKUP_COUNT = 1  # keep 1 rotated copy
+
 
 def setup_logging(verbose: bool = False):
-    """Configure logging with timestamps to both console and file."""
+    """Configure logging with timestamps to both console and rotating file."""
     level = logging.DEBUG if verbose else logging.INFO
+
+    console = logging.StreamHandler(sys.stdout)
+    console.setFormatter(logging.Formatter(LOG_FORMAT, datefmt=LOG_DATE_FORMAT))
+
+    file_handler = logging.handlers.RotatingFileHandler(
+        LOG_FILE,
+        maxBytes=LOG_MAX_BYTES,
+        backupCount=LOG_BACKUP_COUNT,
+    )
+    file_handler.setFormatter(
+        logging.Formatter(LOG_FORMAT, datefmt=LOG_DATE_FORMAT)
+    )
 
     logging.basicConfig(
         level=level,
-        format=LOG_FORMAT,
-        datefmt=LOG_DATE_FORMAT,
-        handlers=[
-            logging.StreamHandler(sys.stdout),
-        ],
+        handlers=[console, file_handler],
     )
 
 
