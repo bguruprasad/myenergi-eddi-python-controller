@@ -181,7 +181,7 @@ def cmd_start(args):
 
     logger.error("Eddi %s: start FAILED [%.2fs]", serial, elapsed)
     notify(
-        f"⚠️ FAILED to start your Eddi water heater after 3 attempts. "
+        f"⚠️ FAILED to start your Eddi water heater. "
         f"Current state: {status_text_for(last_status)}. "
         f"Please check manually."
     )
@@ -213,7 +213,7 @@ def cmd_stop(args):
 
     logger.error("Eddi %s: stop FAILED [%.2fs]", serial, elapsed)
     notify(
-        f"⚠️ FAILED to stop your Eddi water heater after 3 attempts. "
+        f"⚠️ FAILED to stop your Eddi water heater. "
         f"Current state: {status_text_for(last_status)}. "
         f"Please check manually."
     )
