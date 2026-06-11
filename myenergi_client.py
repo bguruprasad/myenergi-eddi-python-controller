@@ -25,6 +25,12 @@ STATUS_STOPPED = 6
 VERIFY_ATTEMPTS = 3
 VERIFY_WAIT_SECONDS = 60
 
+# Within each attempt, poll the status this many times (with a short pause
+# between polls) to account for cloud API lag where the device has already
+# changed state but the server hasn't caught up yet.
+VERIFY_POLLS = 3
+VERIFY_POLL_INTERVAL = 15  # seconds between status polls within one attempt
+
 
 class MyenergiClient:
     """Client for the myenergi API using HTTP Digest Authentication."""
@@ -166,32 +172,69 @@ class MyenergiClient:
             logger.info(
                 "Eddi %s: %s attempt %d/%d", serial, label, attempt, attempts
             )
-            cmd_result = command()
-            logger.info(
-                "Eddi %s: %s command result (attempt %d/%d): %s",
-                serial, label, attempt, attempts, cmd_result,
-            )
+            try:
+                cmd_result = command()
+                logger.info(
+                    "Eddi %s: %s command result (attempt %d/%d): %s",
+                    serial, label, attempt, attempts, cmd_result,
+                )
+            except Exception:  # pylint: disable=broad-except
+                logger.exception(
+                    "Eddi %s: %s command raised an error (attempt %d/%d)",
+                    serial, label, attempt, attempts,
+                )
 
             logger.info(
                 "Waiting %ds before verifying %s...", wait_seconds, label
             )
             time.sleep(wait_seconds)
 
-            logger.info(
-                "Eddi %s: verifying %s status (attempt %d/%d)...",
-                serial, label, attempt, attempts,
-            )
-            eddi = self.get_eddi_by_serial(serial)
-            last_status = eddi.get("sta", -1)
-            if is_target(last_status):
+            # Poll status multiple times within this attempt to ride out
+            # cloud API lag (the device may have obeyed but the server
+            # hasn't reflected the new state yet).
+            verified = False
+            for poll in range(1, VERIFY_POLLS + 1):
                 logger.info(
-                    "Eddi %s: %s verified on attempt %d (sta=%s)",
-                    serial, label, attempt, last_status,
+                    "Eddi %s: verifying %s (attempt %d/%d, poll %d/%d)...",
+                    serial, label, attempt, attempts, poll, VERIFY_POLLS,
                 )
+                try:
+                    eddi = self.get_eddi_by_serial(serial)
+                    last_status = eddi.get("sta", -1)
+                except Exception:  # pylint: disable=broad-except
+                    logger.exception(
+                        "Eddi %s: status check failed "
+                        "(attempt %d/%d, poll %d/%d)",
+                        serial, attempt, attempts, poll, VERIFY_POLLS,
+                    )
+                    # Status unknown; sleep and retry the poll.
+                    if poll < VERIFY_POLLS:
+                        time.sleep(VERIFY_POLL_INTERVAL)
+                    continue
+
+                if is_target(last_status):
+                    logger.info(
+                        "Eddi %s: %s verified on attempt %d, poll %d "
+                        "(sta=%s)",
+                        serial, label, attempt, poll, last_status,
+                    )
+                    verified = True
+                    break
+
+                logger.info(
+                    "Eddi %s: %s not yet confirmed "
+                    "(attempt %d/%d, poll %d/%d, sta=%s)",
+                    serial, label, attempt, attempts,
+                    poll, VERIFY_POLLS, last_status,
+                )
+                if poll < VERIFY_POLLS:
+                    time.sleep(VERIFY_POLL_INTERVAL)
+
+            if verified:
                 return True, last_status
 
             logger.warning(
-                "Eddi %s: %s not confirmed on attempt %d (sta=%s)",
+                "Eddi %s: %s not confirmed after attempt %d (sta=%s)",
                 serial, label, attempt, last_status,
             )
 
