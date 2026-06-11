@@ -22,7 +22,7 @@ STATUS_STOPPED = 6
 
 # Defaults for verified mode changes: poll status after each command to
 # confirm the device actually obeyed, retrying a few times before giving up.
-VERIFY_ATTEMPTS = 3
+VERIFY_ATTEMPTS = 5
 VERIFY_WAIT_SECONDS = 60
 
 # Within each attempt, poll the status this many times (with a short pause
