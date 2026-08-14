@@ -14,7 +14,7 @@ warnings.filterwarnings("ignore", message=".*urllib3.*OpenSSL.*")
 from dotenv import load_dotenv  # pylint: disable=wrong-import-position
 
 from myenergi_client import MyenergiClient  # pylint: disable=wrong-import-position
-from notifier import send_whatsapp_multi  # pylint: disable=wrong-import-position
+from notifier import send_telegram_multi  # pylint: disable=wrong-import-position
 
 logger = logging.getLogger("eddi_control")
 
@@ -81,15 +81,15 @@ def get_client() -> MyenergiClient:
 
 
 def notify(message: str):
-    """Send a WhatsApp notification if Callmebot credentials are configured."""
-    phones = os.getenv("CALLMEBOT_PHONE")
-    api_keys = os.getenv("CALLMEBOT_API_KEY")
+    """Send a Telegram notification if bot credentials are configured."""
+    token = os.getenv("TELEGRAM_BOT_TOKEN")
+    chat_ids = os.getenv("TELEGRAM_CHAT_ID")
 
-    if not phones or not api_keys:
-        logger.debug("WhatsApp notifications not configured, skipping")
+    if not token or not chat_ids:
+        logger.debug("Telegram notifications not configured, skipping")
         return
 
-    send_whatsapp_multi(phones, api_keys, message)
+    send_telegram_multi(token, chat_ids, message)
 
 
 def pick_eddi(client: MyenergiClient, serial: str = None) -> str:
@@ -159,7 +159,7 @@ def cmd_status(args):  # pylint: disable=too-many-locals
     elapsed = time.time() - start_time
     logger.info("Completed in %.2fs", elapsed)
 
-    # Build compact status message for WhatsApp
+    # Build compact status message for Telegram
     msg = f"📊 Eddi Status: {status_text} | Grid: {format_power(grid)}."
     notify(msg)
 
