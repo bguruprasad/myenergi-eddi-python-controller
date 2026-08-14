@@ -1,13 +1,13 @@
 # myenergi Eddi Controller
 
-Automate start/stop and boost control for your myenergi Eddi via the unofficial API. Includes optional WhatsApp notifications via Callmebot.
+Automate start/stop and boost control for your myenergi Eddi via the unofficial API. Includes optional Telegram notifications.
 
 ## Features
 
 - Start, stop, and boost your Eddi water heater from the command line
 - View real-time status (power, temperatures, mode)
 - Schedule automation via cron
-- WhatsApp notifications on every action (optional)
+- Telegram notifications on every action (optional)
 - Structured logging with timestamps and duration tracking
 - Verbose mode (`-v`) for debugging API calls
 
@@ -34,8 +34,8 @@ Copy `.env.example` to `.env` and set the following:
 | `MYENERGI_HUB_SERIAL` | Yes | Your hub serial number (found in the app under Hub, or printed on the device) |
 | `MYENERGI_API_KEY` | Yes | API key generated from the myenergi mobile app (My Account > Advanced) |
 | `MYENERGI_SERVER` | No | Server hostname, e.g. `s18` (auto-discovered from the director if not set) |
-| `CALLMEBOT_PHONE` | No | Phone number(s) with country code for WhatsApp notifications. Comma-separated for multiple recipients. |
-| `CALLMEBOT_API_KEY` | No | Callmebot API key(s). Comma-separated, matching the order of phone numbers. |
+| `TELEGRAM_BOT_TOKEN` | No | Bot token from BotFather. Enables Telegram notifications. |
+| `TELEGRAM_CHAT_ID` | No | Target chat ID(s). Comma-separated for multiple recipients. |
 
 ## Usage
 
@@ -123,29 +123,42 @@ MIN  HOUR  DAY  MONTH  WEEKDAY  command
 cat eddi_cron.log
 ```
 
-## WhatsApp Notifications (Optional)
+## Telegram Notifications (Optional)
 
-Get a WhatsApp message every time the Eddi is started, stopped, boosted, or when you check status. Powered by [Callmebot](https://www.callmebot.com/).
+Get a Telegram message every time the Eddi is started, stopped, boosted, or when you check status. Uses the official [Telegram Bot API](https://core.telegram.org/bots/api) — free, with no per-message limits at this volume.
 
 ### Setup
 
-1. Add **+34 611 04 87 48** to your WhatsApp contacts
-2. Send **`I allow callmebot to send me messages`** to that number on WhatsApp
-3. You'll receive an **API key** in the reply
-4. Add to your `.env`:
+1. In Telegram, message **@BotFather** and send `/newbot`
+2. Choose a display name and a unique username ending in `bot`
+3. BotFather replies with a **bot token** — treat it like a password
+4. Open your new bot and press **Start**, then send it any message
+
+   Bots cannot message you until you message them first. Skipping this causes `chat not found` errors.
+
+5. Fetch your chat ID:
+   ```bash
+   curl -s "https://api.telegram.org/bot<YOUR_TOKEN>/getUpdates" | python3 -m json.tool
+   ```
+   Look for `"chat": {"id": ...}`. Personal chats have positive IDs; groups are negative.
+
+6. Add to your `.env`:
    ```
    # Single recipient
-   CALLMEBOT_PHONE=+353861234567
-   CALLMEBOT_API_KEY=your_api_key
+   TELEGRAM_BOT_TOKEN=123456789:AA-token-from-botfather
+   TELEGRAM_CHAT_ID=123456789
 
-   # Multiple recipients (both need to register with Callmebot)
-   CALLMEBOT_PHONE=+353861234567,+353869876543
-   CALLMEBOT_API_KEY=apikey1,apikey2
+   # Multiple recipients (each must message the bot first)
+   TELEGRAM_CHAT_ID=123456789,987654321
    ```
+
+To notify a group instead, add the bot to the group and use the group's (negative) chat ID — recipients then manage themselves via group membership.
+
+If the token ever leaks, send `/revoke` to BotFather to issue a new one. The bot and chat IDs are unaffected.
 
 ### Notification messages
 
-| Command | WhatsApp Message |
+| Command | Telegram Message |
 |---------|-----------------|
 | `start` | 🟢 Your Eddi water heater has been started. |
 | `stop` | 🔴 Your Eddi water heater has been stopped. |
@@ -153,7 +166,7 @@ Get a WhatsApp message every time the Eddi is started, stopped, boosted, or when
 | `boost --cancel` | ⏹ Your Eddi water heater boost has been cancelled. |
 | `status` | 📊 Eddi Status: Stopped \| Grid: -1.2 kW. |
 
-Notifications are optional. If the env vars are not set, the tool works normally without them. There may be a 5-15 second delay on messages due to the free Callmebot service.
+Notifications are optional. If the env vars are not set, the tool works normally without them.
 
 ## License
 

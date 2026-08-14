@@ -1,4 +1,4 @@
-"""WhatsApp notification via Callmebot API."""
+"""Telegram notification via the Bot API."""
 
 from __future__ import annotations
 
@@ -8,65 +8,61 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-CALLMEBOT_URL = "https://api.callmebot.com/whatsapp.php"
+TELEGRAM_API_URL = "https://api.telegram.org/bot{token}/sendMessage"
 
 
-def send_whatsapp(phone: str, api_key: str, message: str) -> bool:
+def send_telegram(token: str, chat_id: str, message: str) -> bool:
     """
-    Send a WhatsApp message via Callmebot.
+    Send a message to a single Telegram chat.
 
     Args:
-        phone: Phone number with country code (e.g. +353861234567)
-        api_key: Callmebot API key
+        token: Telegram bot token from BotFather
+        chat_id: Target chat ID (positive for users, negative for groups)
         message: Message text to send
 
     Returns:
         True if sent successfully, False otherwise
     """
     try:
-        params = {
-            "phone": phone.lstrip("+"),
-            "text": message,
-            "apikey": api_key,
-        }
-        logger.debug("Sending WhatsApp notification to %s", phone)
-        resp = requests.get(CALLMEBOT_URL, params=params, timeout=15)
+        logger.debug("Sending Telegram notification to chat %s", chat_id)
+        resp = requests.post(
+            TELEGRAM_API_URL.format(token=token),
+            data={"chat_id": chat_id, "text": message},
+            timeout=15,
+        )
 
-        if resp.status_code == 200:
-            logger.info("WhatsApp notification sent to %s", phone)
+        if resp.ok and resp.json().get("ok"):
+            logger.info("Telegram notification sent to chat %s", chat_id)
             return True
 
+        # Telegram puts a human-readable reason in `description`.
+        try:
+            reason = resp.json().get("description", resp.text)
+        except ValueError:
+            reason = resp.text
+
         logger.warning(
-            "WhatsApp notification failed for %s: HTTP %d - %s",
-            phone, resp.status_code, resp.text,
+            "Telegram notification failed for chat %s: HTTP %d - %s",
+            chat_id, resp.status_code, reason,
         )
         return False
 
     except requests.RequestException as exc:
-        logger.warning("WhatsApp notification failed for %s: %s", phone, exc)
+        logger.warning(
+            "Telegram notification failed for chat %s: %s", chat_id, exc
+        )
         return False
 
 
-def send_whatsapp_multi(phones: str, api_keys: str, message: str):
+def send_telegram_multi(token: str, chat_ids: str, message: str):
     """
-    Send a WhatsApp message to multiple recipients.
+    Send a message to one or more Telegram chats.
 
     Args:
-        phones: Comma-separated phone numbers
-        api_keys: Comma-separated API keys (matching order)
+        token: Telegram bot token from BotFather
+        chat_ids: Comma-separated chat IDs
         message: Message text to send
     """
-    phone_list = [p.strip() for p in phones.split(",")]
-    key_list = [k.strip() for k in api_keys.split(",")]
-
-    if len(phone_list) != len(key_list):
-        logger.error(
-            "CALLMEBOT_PHONE has %d numbers but CALLMEBOT_API_KEY has %d keys. "
-            "They must match.",
-            len(phone_list), len(key_list),
-        )
-        return
-
-    for phone, api_key in zip(phone_list, key_list):
-        if phone and api_key:
-            send_whatsapp(phone, api_key, message)
+    for chat_id in (c.strip() for c in chat_ids.split(",")):
+        if chat_id:
+            send_telegram(token, chat_id, message)
